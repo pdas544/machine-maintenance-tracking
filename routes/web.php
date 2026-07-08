@@ -22,6 +22,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Mechanics
     Route::patch('/tickets/{ticket}/status', [TicketController::class, 'updateStatus']);
+
+
+    Route::get('/tickets/{ticket}/print', [TicketController::class, 'print'])->name('tickets.print');
 });
 
 
