@@ -10,42 +10,34 @@
             </div>
         @endif
 
-        @if(auth()->user()->role_id == 3)
-            @php
-                $pending = $tickets->where('status', 'pending')->count();
-                $inProgress = $tickets->where('status', 'in_progress')->count();
-                $completed = $tickets->where('status', 'completed')->count();
-            @endphp
-            <div class="row g-2 px-2 mb-4">
-                <div class="col-4">
-                    <div class="card bg-warning text-dark border-0 shadow-sm text-center py-2">
-                        <h5 class="mb-0 fw-bold">{{ $pending }}</h5>
-                        <small>Pending</small>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="card bg-info text-dark border-0 shadow-sm text-center py-2">
-                        <h5 class="mb-0 fw-bold">{{ $inProgress }}</h5>
-                        <small>In Progress</small>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="card bg-success text-white border-0 shadow-sm text-center py-2">
-                        <h5 class="mb-0 fw-bold">{{ $completed }}</h5>
-                        <small>Completed</small>
-                    </div>
+        @php
+            $pending = $tickets->where('status', 'pending')->count();
+            $inProgress = $tickets->where('status', 'in_progress')->count();
+            $completed = $tickets->where('status', 'completed')->count();
+        @endphp
+        <div class="row g-2 px-2 mb-4">
+            <div class="col-4">
+                <div class="card bg-warning text-dark border-0 shadow-sm text-center py-2">
+                    <h5 class="mb-0 fw-bold">{{ $pending }}</h5>
+                    <small>Pending</small>
                 </div>
             </div>
-        @endif
+            <div class="col-4">
+                <div class="card bg-info text-dark border-0 shadow-sm text-center py-2">
+                    <h5 class="mb-0 fw-bold">{{ $inProgress }}</h5>
+                    <small>In Progress</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="card bg-success text-white border-0 shadow-sm text-center py-2">
+                    <h5 class="mb-0 fw-bold">{{ $completed }}</h5>
+                    <small>Completed</small>
+                </div>
+            </div>
+        </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-3 px-2">
-            <h4 class="mb-0 fw-bold">Active Jobs</h4>
-
-            @if(in_array(auth()->user()->role_id, [1, 2]))
-                <button class="btn btn-primary rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#raiseTicketModal">
-                    <i class="bi bi-plus-lg"></i> Raise Ticket
-                </button>
-            @endif
+        <div class="mb-3 px-2">
+            <h4 class="mb-0 fw-bold">My Assigned Jobs</h4>
         </div>
 
         <div class="row g-3 px-2">
@@ -69,14 +61,31 @@
                             <div class="text-muted" style="font-size: 0.8rem;">
                                 <i class="bi bi-clock"></i> Raised: {{ $ticket->raised_at }}
                             </div>
+                            @if($ticket->acknowledged_at)
+                                <div class="text-muted mt-1" style="font-size: 0.8rem;">
+                                    <i class="bi bi-person-check"></i> Acknowledged at {{ $ticket->acknowledged_at }}
+                                </div>
+                            @endif
+                            @if($ticket->resolved_at)
+                                <div class="text-muted mt-1" style="font-size: 0.8rem;">
+                                    <i class="bi bi-check2-circle"></i> Closed at: {{ $ticket->resolved_at }}
+                                </div>
+                            @endif
 
-                            @if(auth()->user()->role_id == 3 && !in_array($ticket->status, ['completed', 'unfixable_escalated']))
-                                <button class="btn btn-sm btn-outline-primary w-100 mt-3"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#updateStatusModal"
-                                        data-ticket-id="{{ $ticket->id }}">
-                                    <i class="bi bi-tools"></i> Update Status
-                                </button>
+                            @if(!in_array($ticket->status, ['completed', 'unfixable_escalated']))
+                                <div class="d-flex gap-2 mt-3">
+                                    @if(!in_array($ticket->status, ['completed', 'unfixable_escalated']))
+                                        <button class="btn btn-sm btn-outline-primary w-100"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#updateStatusModal"
+                                                data-ticket-id="{{ $ticket->id }}">
+                                            <i class="bi bi-tools"></i> Update Status
+                                        </button>
+                                    @endif
+                                    <a href="{{ route('tickets.print', $ticket->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
+                                        <i class="bi bi-printer"></i> Print Job Card
+                                    </a>
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -84,36 +93,11 @@
             @empty
                 <div class="col-12">
                     <div class="text-center text-muted py-5 bg-white rounded shadow-sm">
-                        <i class="bi bi-clipboard-check fs-1"></i>
-                        <p class="mt-2 mb-0">No active tickets found.</p>
+                        <i class="bi bi-wrench fs-1"></i>
+                        <p class="mt-2 mb-0">No active jobs assigned to you.</p>
                     </div>
                 </div>
             @endforelse
-        </div>
-    </div>
-
-    <div class="modal fade" id="raiseTicketModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Report Breakdown</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form action="{{ route('tickets.store') }}" method="POST">
-                        @csrf
-                        <div class="mb-3">
-                            <label class="form-label">Machine ID</label>
-                            <input type="number" name="machine_id" class="form-control form-control-lg" min="1" max="135" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Issue Description</label>
-                            <textarea name="issue_description" class="form-control" rows="3" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100 mt-2">Submit Ticket</button>
-                    </form>
-                </div>
-            </div>
         </div>
     </div>
 
