@@ -3,87 +3,71 @@ namespace App\Http\Controllers;
 
 use App\Models\Ticket;
 use App\Models\Machine;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreTicketRequest;
+use App\Http\Requests\UpdateTicketStatusRequest;
+use App\Services\TicketService;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\Role;
 
 class TicketController extends Controller
 {
-    // 1. Blade Server-Side Fetch (No JS)
+    public function __construct(
+        protected TicketService $ticketService
+    ) {}
+
     public function index()
     {
         $user = Auth::user();
+        $tickets = $this->ticketService->getTicketsForUser($user);
+        $machines = Machine::orderBy('machine_code')->get();
 
-        $query = Ticket::with(['machine.linesOrGroup', 'raiser', 'mechanic']);
-
-
-        if (in_array($user->role_id, [1, 2])) {
-            $tickets = $query->where('raised_by', $user->id)->latest('updated_at')->get();
-            return view('dashboards.operator', compact('tickets'));
+        if ($user->role_id === Role::Operator->value || $user->role_id === Role::LineLeader->value) {
+            return view('dashboards.operator', compact('tickets', 'machines'));
+        } elseif ($user->role_id === Role::Mechanic->value) {
+            return view('dashboards.mechanic', compact('tickets', 'machines'));
+        } elseif ($user->role_id === Role::FloorIncharge->value) {
+            $relevantNotifications = $this->ticketService->getRelevantNotificationsForUser($user);
+            return view('dashboards.incharge', compact('tickets', 'machines', 'relevantNotifications'));
         }
 
-
-        elseif ($user->role_id === 3) {
-            $tickets = $query->where('assigned_mechanic_id', $user->id)->latest('updated_at')->get();
-            return view('dashboards.mechanic', compact('tickets'));
-        }
-
-        // Fallback for other roles
-        $tickets = $query->latest('updated_at')->get();
-        return view('dashboard', compact('tickets'));
+        return view('dashboard', compact('tickets', 'machines'));
     }
 
-    // 2. Raise Ticket via Standard Form Post
-    public function store(Request $request)
+    public function store(StoreTicketRequest $request)
     {
-        $request->validate([
-            'machine_id' => 'required|exists:machines,id',
-            'issue_description' => 'required|string'
-        ]);
+        $this->authorize('create', Ticket::class);
 
-        $machine = Machine::with('linesOrGroup.segment.mechanics')->findOrFail($request->machine_id);
-        $mechanic = $machine->linesOrGroup->segment->mechanics->first();
+        $this->ticketService->storeTicket(
+            $request->validated(),
+            Auth::id()
+        );
 
-        Ticket::create([
-            'machine_id' => $request->machine_id,
-            'raised_by' => Auth::id(),
-            'assigned_mechanic_id' => $mechanic ? $mechanic->id : null,
-            'issue_description' => $request->issue_description,
-        ]);
-
-        // Redirect back to dashboard instead of returning JSON
         return redirect()->route('dashboard')->with('success', 'Ticket raised successfully!');
     }
 
-    // 3. Update Status via Standard Form Patch
-    public function updateStatus(Request $request, Ticket $ticket)
+    public function updateStatus(UpdateTicketStatusRequest $request, Ticket $ticket)
     {
-        $request->validate([
-            'status' => 'required|in:in_progress,completed,unfixable_escalated',
-            'mechanic_remarks' => 'nullable|string'
-        ]);
+        $this->authorize('update', $ticket);
 
-        $updateData = ['status' => $request->status];
-
-        if ($request->mechanic_remarks) {
-            $updateData['mechanic_remarks'] = $request->mechanic_remarks;
-        }
-
-        if ($request->status === 'in_progress' && !$ticket->acknowledged_at) {
-            $updateData['acknowledged_at'] = now();
-        } elseif ($request->status === 'completed') {
-            $updateData['resolved_at'] = now();
-        }
-
-        $ticket->update($updateData);
+        $this->ticketService->updateStatus(
+            $ticket,
+            $request->validated(),
+            Auth::user()
+        );
 
         return redirect()->route('dashboard')->with('success', 'Job status updated!');
     }
 
-
-    public function print(Ticket $ticket){
-        // Ensure relationships are loaded for the print view
+    public function print(Ticket $ticket)
+    {
         $ticket->load(['machine.linesOrGroup', 'raiser']);
         return view('print-job-card', compact('ticket'));
+    }
+
+    public function markNotificationAsRead($id)
+    {
+        Auth::user()->notifications()->where('id', $id)->first()?->markAsRead();
+        return redirect()->back()->with('success', 'Notification closed!');
     }
 }
 
