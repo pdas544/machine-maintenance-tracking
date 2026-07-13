@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Seed Roles
-        $roles = ['operator', 'line_leader', 'mechanic', 'floor_incharge', 'maintenance_head', 'maintenance_manager'];
+        $roles = ['operator', 'line_leader', 'mechanic', 'floor_incharge', 'maintenance_head', 'maintenance_manager', 'industrial_engineer'];
         foreach ($roles as $role) {
             Role::create(['name' => $role]);
         }
@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
         $mechParts = User::create(['name' => 'Mike Parts-Mech', 'email' => 'mech1@factory.com', 'password' => $password, 'role_id' => 3]);
         $mechAssy = User::create(['name' => 'Bob Assy-Mech', 'email' => 'mech2@factory.com', 'password' => $password, 'role_id' => 3]);
         $incharge = User::create(['name' => 'Frank Incharge', 'email' => 'incharge@factory.com', 'password' => $password, 'role_id' => 4]);
+        $ie = User::create(['name' => 'Ivy Engineer', 'email' => 'ie@factory.com', 'password' => $password, 'role_id' => 7]);
 
         // 3. Seed Segments
         $partsSegment = Segment::create(['name' => 'parts']);
