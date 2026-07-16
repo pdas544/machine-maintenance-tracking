@@ -24,8 +24,6 @@ Route::middleware(['auth'])->group(function () {
     // Mechanics
     Route::patch('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
 
-
-    Route::get('/tickets/{ticket}/print', [TicketController::class, 'print'])->name('tickets.print');
     Route::post('/notifications/{notification}/read', [TicketController::class, 'markNotificationAsRead'])->name('notifications.read');
 });
 
